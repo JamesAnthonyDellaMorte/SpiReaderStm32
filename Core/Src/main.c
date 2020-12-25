@@ -53,7 +53,20 @@ UART_HandleTypeDef huart3;
 
 PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
-osThreadId defaultTaskHandle;
+/* Definitions for defaultTask */
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+  .name = "defaultTask",
+  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 2048 * 4
+};
+/* Definitions for myTask02 */
+osThreadId_t myTask02Handle;
+const osThreadAttr_t myTask02_attributes = {
+  .name = "myTask02",
+  .priority = (osPriority_t) osPriorityLow,
+  .stack_size = 512 * 4
+};
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
@@ -64,7 +77,8 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_SPI1_Init(void);
-void StartDefaultTask(void const * argument);
+void StartDefaultTask(void *argument);
+void StartTask02(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -113,6 +127,9 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();
+
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
@@ -130,13 +147,19 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* definition and creation of defaultTask */
-  osThreadDef(defaultTask, StartDefaultTask, osPriorityNormal, 0, 2048);
-  defaultTaskHandle = osThreadCreate(osThread(defaultTask), NULL);
+  /* creation of defaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
+  /* creation of myTask02 */
+  myTask02Handle = osThreadNew(StartTask02, NULL, &myTask02_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
+
+  /* USER CODE BEGIN RTOS_EVENTS */
+  /* add events, ... */
+  /* USER CODE END RTOS_EVENTS */
 
   /* Start scheduler */
   osKernelStart();
@@ -382,7 +405,7 @@ static void MX_GPIO_Init(void)
   * @retval None
   */
 /* USER CODE END Header_StartDefaultTask */
-void StartDefaultTask(void const * argument)
+void StartDefaultTask(void *argument)
 {
   /* init code for LWIP */
   MX_LWIP_Init();
@@ -390,8 +413,13 @@ void StartDefaultTask(void const * argument)
   int local_IP;
  struct dhcp *dhcp_data;
   dhcp_data =netif_dhcp_data(&gnetif);
-  local_IP =dhcp_data->offered_ip_addr.addr;
-  printf("IP %d.%d.%d.%d\n\r",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
+
+  do
+  	  {
+	  local_IP =dhcp_data->offered_ip_addr.addr;
+	  HAL_Delay(100);
+  	  }while(local_IP == 0);
+  printf("IP %d.%d.%d.%d\r\n",(local_IP & 0xff), ((local_IP >> 8) & 0xff), ((local_IP >> 16) & 0xff), (local_IP >> 24));
   int server_fd, new_socket;
       struct sockaddr_in address;
       int opt = 1;
@@ -423,6 +451,62 @@ void StartDefaultTask(void const * argument)
 			 }
   }
   /* USER CODE END 5 */
+}
+
+/* USER CODE BEGIN Header_StartTask02 */
+/**
+* @brief Function implementing the myTask02 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartTask02 */
+void StartTask02(void *argument)
+{
+  /* USER CODE BEGIN StartTask02 */
+  /* Infinite loop */
+	 /* USER CODE BEGIN StartTask02 */
+	  /* Infinite loop */
+		 struct dhcp *dhcp_dat;
+		 dhcp_dat =netif_dhcp_data(&gnetif);
+
+
+	  while(1)
+	  {
+		  int ip = dhcp_dat->offered_ip_addr.addr >> 24;
+		  uint8_t last_word = ip;
+		  uint8_t third_digit = last_word % 10;
+		  last_word /= 10;
+		  uint8_t second_digit = last_word % 10;
+		  last_word /= 10;
+		  uint8_t first_digit = last_word % 10;
+		while(first_digit)
+		{
+		  HAL_GPIO_TogglePin (LD3_GPIO_Port, LD3_Pin);
+		  HAL_Delay(500);
+		  HAL_GPIO_TogglePin (LD3_GPIO_Port, LD3_Pin);
+		  HAL_Delay(500);
+		  first_digit--;
+		}
+		while(second_digit)
+		{
+		  HAL_GPIO_TogglePin (LD2_GPIO_Port, LD2_Pin);
+			HAL_Delay(500);
+		  HAL_GPIO_TogglePin (LD2_GPIO_Port, LD2_Pin);
+		  HAL_Delay(500);
+		  second_digit--;
+		}
+		while(third_digit)
+		{
+		  HAL_GPIO_TogglePin (LD1_GPIO_Port, LD1_Pin);
+		  HAL_Delay(500);
+		  HAL_GPIO_TogglePin (LD1_GPIO_Port, LD1_Pin);
+		  HAL_Delay(500);
+		  third_digit--;
+		}
+
+
+	  }
+  /* USER CODE END StartTask02 */
 }
 
  /**
